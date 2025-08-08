@@ -28,7 +28,7 @@ var rootCmd = &cobra.Command{
 	Use:   cliName,
 	Short: "Fetch logs from Google Cloud Logging",
 	Long:  `Fetch logs from Google Cloud Logging`,
-	Args:  cobra.MatchAll(cobra.MaximumNArgs(1), cobra.OnlyValidArgs),
+	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		projectId := viper.GetString("project")
 		if projectId == "" {
@@ -44,7 +44,11 @@ var rootCmd = &cobra.Command{
 		}
 		allFilters := buildFilter(from, to, filter)
 
-		newestFirst := viper.GetString("order") == "desc"
+		order := viper.GetString("order")
+		if order != "asc" && order != "desc" {
+			cobra.CheckErr(fmt.Errorf("invalid --order %q: valid values are 'asc' or 'desc'", order))
+		}
+		newestFirst := order == "desc"
 
 		ctx := cmd.Context()
 
@@ -142,6 +146,9 @@ func determineTimeWindow(cmd *cobra.Command) (from, to time.Time, err error) {
 		to, err = time.Parse(time.RFC3339, toFlag)
 		if err != nil {
 			return from, to, fmt.Errorf("invalid --to: %w", err)
+		}
+		if from.After(to) {
+			return from, to, errors.New("--from must be before or equal to --to")
 		}
 		return from, to, nil
 	} else if fromFlag == "" && toFlag == "" {
