@@ -81,15 +81,15 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	configDescription := fmt.Sprintf("config file (default is .%v.yaml in the working directory or in the home directory)", cliName)
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", configDescription)
+	rootCmd.Flags().StringVar(&cfgFile, "config", "", configDescription)
+	err := rootCmd.MarkFlagFilename("config")
+	cobra.CheckErr(err)
 
 	rootCmd.Flags().String("project", "", "Google Cloud Platform project ID")
 	rootCmd.Flags().String("from", "", "start of time range")
 	rootCmd.Flags().String("to", "", "end of time range")
 	rootCmd.Flags().String("freshness", "", "maximum age of log entries (e.g. 2h, 3d4h)")
 	rootCmd.Flags().String("order", "desc", "ordering based on timestamp, valid values: asc, desc")
-
-	rootCmd.MarkFlagFilename("config")
 
 	viper.BindPFlag("project", rootCmd.Flags().Lookup("project"))
 	viper.BindPFlag("order", rootCmd.Flags().Lookup("order"))
@@ -251,13 +251,13 @@ outer:
 			var entries []*loggingpb.LogEntry
 			nextToken, err := pager.NextPage(&entries)
 			if err != nil {
-				if errors.Is(err, context.Canceled) || err.Error() == "no more items in iterator" {
+				if errors.Is(err, context.Canceled) || errors.Is(err, iterator.Done) {
 					break outer
 				}
 				if rateLimited = handleRateLimitError(err, rateLimited); rateLimited {
 					break
 				}
-				if err, ok := status.FromError(err); ok && err.Code() == codes.Unauthenticated {
+				if st, ok := status.FromError(err); ok && st.Code() == codes.Unauthenticated {
 					return errors.New("unauthenticated, please run `gcloud auth application-default login` and try again")
 				}
 				return err
