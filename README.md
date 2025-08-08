@@ -12,6 +12,20 @@ I created Grapple to scratch my own itch, so it currently supports only the opti
 
 ## Installation
 
+### Homebrew (recommended on macOS)
+
+```bash
+brew install --cask dippi/tap/grapple
+```
+
+### Standalone binaries (all platforms)
+
+Download the latest archive for your OS/arch from the
+[GitHub Releases](https://github.com/dippi/grapple/releases), extract it, and place
+the `grapple` binary somewhere in your `PATH` (e.g. `/usr/local/bin`).
+
+### Go install
+
 ```bash
 go install github.com/dippi/grapple@latest
 ```

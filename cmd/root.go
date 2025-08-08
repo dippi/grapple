@@ -23,12 +23,14 @@ import (
 
 var cliName = "grapple"
 var cfgFile string
+var Version = "development"
 
 var rootCmd = &cobra.Command{
 	Use:   cliName + " [flags] [filter]",
 	Short: "Fetch logs from Google Cloud Logging",
 	Long:  `Fetch logs from Google Cloud Logging`,
 	Example: `grapple --project=my-project --freshness=1h 'some.property="value"'`,
+	Version: Version,
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		projectId := viper.GetString("project")
