@@ -16,6 +16,7 @@
 !.goreleaser.yaml
 !.github/workflows/release.yml
 !scripts/completions.sh
+!.github/dependabot.yml
 
 # ...even if they are in subdirectories
 !*/
