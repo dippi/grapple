@@ -28,10 +28,22 @@ var Version = "development"
 var rootCmd = &cobra.Command{
 	Use:   cliName + " [flags] [filter]",
 	Short: "Fetch logs from Google Cloud Logging",
-	Long:  `Fetch logs from Google Cloud Logging`,
-	Example: `grapple --project=my-project --freshness=1h 'some.property="value"'`,
+	Long: `
+Grapple - Get a grip on your logs!
+
+A tiny, fast CLI to fetch entries from Google Cloud Logging and stream them to stdout as JSON lines.
+The UX mirrors "gcloud logging read", so filters and flags should feel familiar.
+
+Grapple uses Google Application Default Credentials (ADC) for authentication.
+See https://cloud.google.com/docs/authentication/provide-credentials-adc for more info.
+
+Authenticate with:
+  gcloud auth application-default login
+If credentials expire, simply re-run the gcloud command.
+`,
+	Example: cliName + ` --project=my-project --freshness=1h 'some.property="value"'`,
 	Version: Version,
-	Args:  cobra.MaximumNArgs(1),
+	Args:    cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		projectId := viper.GetString("project")
 		if projectId == "" {
@@ -82,16 +94,17 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	configDescription := fmt.Sprintf("config file (default is .%v.yaml in the working directory or in the home directory)", cliName)
+	configDescription := fmt.Sprintf("config file (default \".%v.yaml\" in the working directory or in the home directory)", cliName)
 	rootCmd.Flags().StringVar(&cfgFile, "config", "", configDescription)
 	err := rootCmd.MarkFlagFilename("config")
 	cobra.CheckErr(err)
 
-	rootCmd.Flags().String("project", "", "Google Cloud Platform project ID")
-	rootCmd.Flags().String("from", "", "start of time range")
-	rootCmd.Flags().String("to", "", "end of time range")
-	rootCmd.Flags().String("freshness", "", "maximum age of log entries (e.g. 2h, 3d4h)")
-	rootCmd.Flags().String("order", "desc", "ordering based on timestamp, valid values: asc, desc")
+	rootCmd.Flags().String("project", "", "Google Cloud Platform project ID (required when not specified in the config file)")
+	rootCmd.Flags().String("freshness", "", "maximum age of entries (e.g. \"2h\", \"3d4h\") (default \"1d\")")
+	rootCmd.Flags().String("from", "", "start of the time window (mutually exclusive with --freshness)")
+	rootCmd.Flags().String("to", "", "end of the time window (mutually exclusive with --freshness)")
+	rootCmd.Flags().String("order", "desc", "sort order based on timestamp (valid values: \"asc\", \"desc\")")
+	rootCmd.Flags().SortFlags = false
 
 	viper.BindPFlag("project", rootCmd.Flags().Lookup("project"))
 	viper.BindPFlag("order", rootCmd.Flags().Lookup("order"))
