@@ -7,6 +7,7 @@ project_name: grapple
 before:
   hooks:
     - go mod tidy
+    - ./scripts/completions.sh
 
 builds:
   - env:
@@ -40,6 +41,7 @@ archives:
     files:
       - LICENSE
       - README.md
+      - completions/*
     # use zip for windows archives
     format_overrides:
       - goos: windows
@@ -64,3 +66,7 @@ homebrew_casks:
       owner: dippi
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    completions:
+      bash: completions/grapple.bash
+      zsh: completions/grapple.zsh
+      fish: completions/grapple.fish

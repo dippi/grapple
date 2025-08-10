@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/logging/apiv2/loggingpb"
@@ -96,8 +97,6 @@ func init() {
 
 	configDescription := fmt.Sprintf("config file (default \".%v.yaml\" in the working directory or in the home directory)", cliName)
 	rootCmd.Flags().StringVar(&cfgFile, "config", "", configDescription)
-	err := rootCmd.MarkFlagFilename("config")
-	cobra.CheckErr(err)
 
 	rootCmd.Flags().String("project", "", "Google Cloud Platform project ID (required when not specified in the config file)")
 	rootCmd.Flags().String("freshness", "", "maximum age of entries (e.g. \"2h\", \"3d4h\") (default \"1d\")")
@@ -108,6 +107,15 @@ func init() {
 
 	viper.BindPFlag("project", rootCmd.Flags().Lookup("project"))
 	viper.BindPFlag("order", rootCmd.Flags().Lookup("order"))
+
+	// Completions
+	rootCmd.ValidArgsFunction = disableFileCompletion
+	cobra.CheckErr(rootCmd.MarkFlagFilename("config", ".yaml", ".yml"))
+	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("project", disableFileCompletion))
+	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("freshness", completeFreshness))
+	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("from", completeFrom))
+	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("to", completeTo))
+	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("order", completeOrder))
 }
 
 func initConfig() {
@@ -300,4 +308,65 @@ outer:
 		}
 	}
 	return nil
+}
+
+// disableFileCompletion disables file completion
+func disableFileCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return nil, cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeFreshness suggests common durations for the --freshness flag, and completes numeric input with appropriate time units.
+func completeFreshness(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if toComplete == "" {
+		return []string{"15m", "1h", "3h", "6h", "12h", "1d", "7d", "30d"}, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
+	}
+
+	if n, err := strconv.Atoi(toComplete); err == nil {
+		suffixes := []string{"s", "m", "h", "d"}
+		out := make([]string, len(suffixes))
+		for i, s := range suffixes {
+			out[i] = fmt.Sprintf("%d%s", n, s)
+		}
+		return out, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
+	}
+
+	return nil, cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeOrder provides shell completions for the --order flag, suggesting "asc" and "desc".
+func completeOrder(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	candidates := []string{"asc", "desc"}
+	var out []string
+	for _, c := range candidates {
+		if toComplete == "" || strings.HasPrefix(c, toComplete) {
+			out = append(out, c)
+		}
+	}
+	return out, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
+}
+
+// baseTimeForCompletion suggests a datetime for a flag completion.
+// If the complementary flag (otherFlag) is set and valid, its value is used;
+// otherwise, it defaults to midnight UTC today.
+func baseTimeForCompletion(cmd *cobra.Command, otherFlag string) ([]string, cobra.ShellCompDirective) {
+	now := time.Now().UTC()
+	base := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	if v := cmd.Flag(otherFlag).Value.String(); v != "" {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			base = t
+		}
+	}
+	return []string{base.Format(time.RFC3339)}, cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeFrom suggests a starting RFC3339 datetime for the --from flag, defaulting to midnight UTC today,
+// or using the value of --to (if provided and valid) as a more relevant suggestion.
+func completeFrom(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return baseTimeForCompletion(cmd, "to")
+}
+
+// completeTo suggests an ending RFC3339 datetime for the --to flag, defaulting to midnight UTC today,
+// or using the value of --from (if provided and valid) as a more relevant suggestion.
+func completeTo(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return baseTimeForCompletion(cmd, "from")
 }

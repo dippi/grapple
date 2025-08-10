@@ -32,6 +32,28 @@ go install github.com/dippi/grapple@latest
 
 This drops a `grapple` executable in `$(go env GOPATH)/bin` – make sure that directory is in your `$PATH`.
 
+### Shell completions
+
+Completions are already included when installing via Homebrew and are also packaged in the release archives under `completions/`.
+
+You can also generate them on the fly:
+
+```bash
+# bash
+source <(grapple completion bash)
+
+# zsh
+source <(grapple completion zsh)
+
+# fish
+grapple completion fish | source
+
+# PowerShell
+grapple completion powershell | Out-String | Invoke-Expression
+```
+
+Persist across shells by sourcing the generated files from your shell profile (e.g. `.bashrc`, `.zshrc`, `config.fish`, or PowerShell profile).
+
 ## Authentication
 
 Set up Application Default Credentials (ADC):
