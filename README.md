@@ -10,6 +10,19 @@ The project was born out of frustration with `gcloud logging read`, which spends
 
 I created Grapple to scratch my own itch, so it currently supports only the options I use regularly. If you miss a flag or a feature feel free to open an issue.
 
+## Table of Contents
+
+- [Table of Contents](#table-of-contents)
+- [Installation](#installation)
+  - [Homebrew (recommended on macOS)](#homebrew-recommended-on-macos)
+  - [Standalone binaries (all platforms)](#standalone-binaries-all-platforms)
+  - [Go install](#go-install)
+  - [Shell completions](#shell-completions)
+- [Authentication](#authentication)
+- [Usage](#usage)
+  - [Main Flags](#main-flags)
+  - [Configuration File](#configuration-file)
+
 ## Installation
 
 ### Homebrew (recommended on macOS)
