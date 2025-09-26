@@ -28,7 +28,7 @@ I created Grapple to scratch my own itch, so it currently supports only the opti
 ### Homebrew (recommended on macOS)
 
 ```bash
-brew install --cask dippi/tap/grapple
+brew install --cask dippi/tap/grapple --no-quarantine
 ```
 
 ### Standalone binaries (all platforms)
