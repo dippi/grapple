@@ -6,9 +6,17 @@ updates:
       interval: "quarterly"
     labels:
       - "dependencies"
+    groups:
+      gomod-all:
+        patterns:
+          - "*"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "quarterly"
     labels:
       - "dependencies"
+    groups:
+      actions-all:
+        patterns:
+          - "*"
