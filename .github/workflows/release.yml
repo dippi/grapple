@@ -6,7 +6,9 @@ on:
       - 'v*'
 
 permissions:
-  contents: write  # allow publishing GitHub Releases
+  contents: write      # allow publishing GitHub Releases
+  id-token: write      # allow keyless attestation of the build artifacts
+  attestations: write
 
 jobs:
   goreleaser:
@@ -34,3 +36,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Attest build artifacts
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: ./dist/checksums.txt
