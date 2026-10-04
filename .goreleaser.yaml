@@ -56,17 +56,22 @@ checksum:
 changelog:
   disable: true
 
-homebrew_casks:
+# GoReleaser deprecates formulas in favor of casks, but Homebrew quarantines
+# cask downloads and Gatekeeper then blocks this binary: it is not notarized.
+# Formula installs are not quarantined, so they work without signing.
+brews:
   - name: grapple
-    binary: grapple
+    directory: Formula
     homepage: https://github.com/dippi/grapple
     description: Fetch logs from Google Cloud Logging
     license: MIT
+    test: |
+      system "#{bin}/grapple --version"
+    extra_install: |
+      bash_completion.install "completions/grapple.bash" => "grapple"
+      zsh_completion.install "completions/grapple.zsh" => "_grapple"
+      fish_completion.install "completions/grapple.fish"
     repository:
       owner: dippi
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    completions:
-      bash: completions/grapple.bash
-      zsh: completions/grapple.zsh
-      fish: completions/grapple.fish

@@ -14,7 +14,7 @@ I created Grapple to scratch my own itch, so it currently supports only the opti
 
 - [Table of Contents](#table-of-contents)
 - [Installation](#installation)
-  - [Homebrew (recommended on macOS)](#homebrew-recommended-on-macos)
+  - [Homebrew (recommended on macOS and Linux)](#homebrew-recommended-on-macos-and-linux)
   - [Standalone binaries (all platforms)](#standalone-binaries-all-platforms)
   - [Go install](#go-install)
   - [Shell completions](#shell-completions)
@@ -25,17 +25,27 @@ I created Grapple to scratch my own itch, so it currently supports only the opti
 
 ## Installation
 
-### Homebrew (recommended on macOS)
+### Homebrew (recommended on macOS and Linux)
 
 ```bash
-brew install --cask dippi/tap/grapple --no-quarantine
+brew install dippi/tap/grapple
 ```
+
+> [!NOTE]
+> Earlier versions were distributed as a cask. If you installed one, remove it
+> once with `brew uninstall --cask grapple` before installing the formula.
 
 ### Standalone binaries (all platforms)
 
 Download the latest archive for your OS/arch from the
 [GitHub Releases](https://github.com/dippi/grapple/releases), extract it, and place
 the `grapple` binary somewhere in your `PATH` (e.g. `/usr/local/bin`).
+
+> [!NOTE]
+> These binaries are not notarized by Apple, so a manually downloaded copy is
+> quarantined and Gatekeeper blocks it. Homebrew and `go install` are not
+> affected. To run a manual download anyway, clear the attribute:
+> `xattr -d com.apple.quarantine /path/to/grapple`.
 
 ### Go install
 
