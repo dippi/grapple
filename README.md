@@ -79,17 +79,23 @@ Persist across shells by sourcing the generated files from your shell profile (e
 
 ## Authentication
 
-Set up Application Default Credentials (ADC):
+Grapple resolves credentials automatically, in this order, and uses the first method that works:
+
+1. An explicit token passed with `--token` (or `GRAPPLE_TOKEN`).
+2. Application Default Credentials (ADC).
+3. Your `gcloud` CLI credentials, when `gcloud` is installed and signed in.
+
+Authenticate once with:
 
 ```bash
-gcloud auth application-default login
+gcloud auth login --update-adc
 ```
 
-See [the official GCP documentation](https://cloud.google.com/docs/authentication/provide-credentials-adc) for more details.
+This keeps both the gcloud CLI and ADC fresh in a single sign-in. If ADC expires — for example because your organization enforces a Google Cloud session length — Grapple transparently falls back to your gcloud credentials.
 
-> [!NOTE]
-> Credentials expire frequently. When this happens, simply repeat the authentication procedure.  
-> If you know a better way to refresh them directly from the CLI, I’d love to hear it.
+Run `grapple auth status` to see which methods are detected, how Grapple would authenticate, and what to fix if none works. Force a method with `--auth=auto|adc|gcloud`.
+
+See [the official GCP documentation](https://cloud.google.com/docs/authentication/provide-credentials-adc) for more details on ADC.
 
 ## Usage
 
@@ -110,6 +116,9 @@ grapple --project=my-project \
 | `--from` (RFC3339 datetime) | Start of the time window (mutually exclusive with `--freshness`)       |
 | `--to` (RFC3339 datetime)   | End of the time window (mutually exclusive with `--freshness`)         |
 | `--order` (`asc`\|`desc`)   | Sort order based on `timestamp` (default `desc`)                       |
+| `--auth` (`auto`\|`adc`\|`gcloud`) | Credential resolution strategy (default `auto`)                |
+| `--token` (string)          | Google Cloud OAuth2 access token (overrides `--auth`)                  |
+| `--verbose`                 | Print authentication diagnostics to stderr                             |
 | `--config` (file path)      | YAML config file (default `.grapple.yaml` in the CWD and `$HOME` dirs) |
 
 The first positional argument is treated as a Logging filter expression, just like in `gcloud`.
@@ -124,3 +133,5 @@ order: asc
 ```
 
 CLI flags override the values coming from the config.
+
+The config also accepts `auth`.

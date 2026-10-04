@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/logging/apiv2/loggingpb"
+	"github.com/dippi/grapple/internal/auth"
 	"github.com/dippi/grapple/internal/logadmin"
 	"github.com/googleapis/gax-go/v2/apierror"
 	"github.com/spf13/cobra"
@@ -35,12 +36,13 @@ Grapple - Get a grip on your logs!
 A tiny, fast CLI to fetch entries from Google Cloud Logging and stream them to stdout as JSON lines.
 The UX mirrors "gcloud logging read", so filters and flags should feel familiar.
 
-Grapple uses Google Application Default Credentials (ADC) for authentication.
+Grapple uses Google Application Default Credentials (ADC) and transparently falls
+back to your gcloud CLI credentials when ADC is missing or expired.
 See https://cloud.google.com/docs/authentication/provide-credentials-adc for more info.
 
 Authenticate with:
-  gcloud auth application-default login
-If credentials expire, simply re-run the gcloud command.
+  gcloud auth login --update-adc
+Run "grapple auth status" to inspect the available credentials.
 `,
 	Example: cliName + ` --project=my-project --freshness=1h 'some.property="value"'`,
 	Version: Version,
@@ -68,7 +70,13 @@ If credentials expire, simply re-run the gcloud command.
 
 		ctx := cmd.Context()
 
-		client, err := logadmin.NewClient(ctx, projectId)
+		authOpts := authOptions(cmd)
+		cobra.CheckErr(auth.ValidateMode(authOpts.Mode))
+
+		res, err := auth.Resolve(ctx, authOpts)
+		cobra.CheckErr(err)
+
+		client, err := logadmin.NewClient(ctx, projectId, res.ClientOptions(projectId)...)
 		cobra.CheckErr(err)
 		defer client.Close()
 
@@ -81,7 +89,7 @@ If credentials expire, simply re-run the gcloud command.
 			opts = append(opts, logadmin.NewestFirst())
 		}
 
-		err = fetchAndProcessLogs(ctx, client, opts)
+		err = fetchAndProcessLogs(ctx, client, projectId, res.Method, opts)
 		cobra.CheckErr(err)
 	},
 }
@@ -105,8 +113,13 @@ func init() {
 	rootCmd.Flags().String("order", "desc", "sort order based on timestamp (valid values: \"asc\", \"desc\")")
 	rootCmd.Flags().SortFlags = false
 
+	rootCmd.PersistentFlags().String("auth", auth.ModeAuto, "authentication method (valid values: \"auto\", \"adc\", \"gcloud\")")
+	rootCmd.PersistentFlags().String("token", "", "Google Cloud OAuth2 access token (overrides --auth)")
+	rootCmd.PersistentFlags().Bool("verbose", false, "print authentication diagnostics to stderr")
+
 	viper.BindPFlag("project", rootCmd.Flags().Lookup("project"))
 	viper.BindPFlag("order", rootCmd.Flags().Lookup("order"))
+	viper.BindPFlag("auth", rootCmd.PersistentFlags().Lookup("auth"))
 
 	// Completions
 	rootCmd.ValidArgsFunction = disableFileCompletion
@@ -116,6 +129,7 @@ func init() {
 	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("from", completeFrom))
 	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("to", completeTo))
 	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("order", completeOrder))
+	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("auth", completeAuth))
 }
 
 func initConfig() {
@@ -136,6 +150,12 @@ func initConfig() {
 
 	if err := viper.ReadInConfig(); err == nil {
 		log.Println("Using config file:", viper.ConfigFileUsed())
+		if viper.InConfig("token") {
+			log.Println("Warning: ignoring \"token\" from config file, use --token or GRAPPLE_TOKEN instead")
+		}
+		if viper.InConfig("verbose") {
+			log.Println("Warning: ignoring \"verbose\" from config file, use the --verbose flag")
+		}
 	} else if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 		log.Fatalf("Error: %v", err)
 	}
@@ -261,9 +281,10 @@ func handleRateLimitError(err error, rateLimited bool) bool {
 }
 
 // fetchAndProcessLogs fetches logs from the API and processes them
-func fetchAndProcessLogs(ctx context.Context, client *logadmin.Client, opts []logadmin.EntriesOption) error {
+func fetchAndProcessLogs(ctx context.Context, client *logadmin.Client, projectID string, method auth.Method, opts []logadmin.EntriesOption) error {
 	rateLimited := false
 	currentToken := ""
+	firstPage := true
 
 outer:
 	for {
@@ -280,11 +301,17 @@ outer:
 				if rateLimited = handleRateLimitError(err, rateLimited); rateLimited {
 					break
 				}
-				if st, ok := status.FromError(err); ok && st.Code() == codes.Unauthenticated {
-					return errors.New("unauthenticated, please run `gcloud auth application-default login` and try again")
+				if st, ok := status.FromError(err); ok {
+					switch st.Code() {
+					case codes.Unauthenticated:
+						return auth.UnauthenticatedError(method, firstPage, err)
+					case codes.PermissionDenied:
+						return auth.PermissionDeniedError(projectID)
+					}
 				}
 				return err
 			}
+			firstPage = false
 
 			if rateLimited {
 				log.Println("Rate limit expired")
@@ -335,7 +362,14 @@ func completeFreshness(cmd *cobra.Command, args []string, toComplete string) ([]
 
 // completeOrder provides shell completions for the --order flag, suggesting "asc" and "desc".
 func completeOrder(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	candidates := []string{"asc", "desc"}
+	return completeCandidates([]string{"asc", "desc"}, toComplete)
+}
+
+func completeAuth(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return completeCandidates([]string{auth.ModeAuto, auth.ModeADC, auth.ModeGcloud}, toComplete)
+}
+
+func completeCandidates(candidates []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	var out []string
 	for _, c := range candidates {
 		if toComplete == "" || strings.HasPrefix(c, toComplete) {
@@ -343,6 +377,33 @@ func completeOrder(cmd *cobra.Command, args []string, toComplete string) ([]stri
 		}
 	}
 	return out, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
+}
+
+func authOptions(cmd *cobra.Command) auth.Options {
+	return auth.Options{
+		Mode:    viper.GetString("auth"),
+		Token:   flagOrEnv(cmd, "token", "GRAPPLE_TOKEN"),
+		Verbose: flagBool(cmd, "verbose"),
+		Logf:    log.Printf,
+	}
+}
+
+func flagOrEnv(cmd *cobra.Command, name, env string) string {
+	if f := cmd.Flag(name); f != nil {
+		if v := f.Value.String(); v != "" {
+			return v
+		}
+	}
+	return os.Getenv(env)
+}
+
+func flagBool(cmd *cobra.Command, name string) bool {
+	f := cmd.Flag(name)
+	if f == nil {
+		return false
+	}
+	v, _ := strconv.ParseBool(f.Value.String())
+	return v
 }
 
 // baseTimeForCompletion suggests a datetime for a flag completion.
